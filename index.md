@@ -23,4 +23,7 @@ gantt
 ![](https://i.imgur.com/zDhsW0e.png)
 
 ## Links
+
 [Demo Page](demo.html)
+
+[Bigger Demo Page](features.html)
