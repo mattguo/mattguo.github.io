@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- lang is corrected to the chosen locale before the intro paints; see applyLocale(). -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -211,8 +212,8 @@ body {
 }
 #boot-error.is-visible { display: block; }
 </style>
-<link id="-gd-engine-icon" rel="icon" type="image/png" href="Majhong2.icon.png" />
-<link rel="apple-touch-icon" href="Majhong2.apple-touch-icon.png"/>
+<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
 
 </head>
 <body>
@@ -246,12 +247,12 @@ body {
 					<div class="title-layout">
 						<div class="top-ornament"><span class="diamond"></span></div>
 						<div class="title-mask" id="title-reveal">
-							<img class="title" id="hero-title" src="intro-assets/title-qingque.png" width="510" height="253" alt="青雀">
+							<img class="title" id="hero-title" src="intro-assets/title-qingque.png" width="510" height="253" alt="">
 							<div class="shimmer" aria-hidden="true"></div>
 						</div>
 						<div class="gold-line"></div>
 						<p class="subtitle" id="subtitle">MAHJONG</p>
-						<p class="loading-label" id="loading-label" aria-live="polite">Loading...</p>
+						<p class="loading-label" id="loading-label" aria-live="polite"></p>
 					</div>
 				</div>
 				<div id="particles"></div>
@@ -262,11 +263,12 @@ body {
 	<div id="boot-error" role="alert"></div>
 </div>
 
+<script src="intro-assets/intro-i18n.js"></script>
 <script src="intro-assets/gsap.min.js"></script>
-<script src="Majhong2.js"></script>
+<script src="index.js"></script>
 <script>
 (function () {
-	const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"Majhong2","experimentalVK":false,"fileSizes":{"Majhong2.pck":61855972,"Majhong2.wasm":37896978},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+	const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":7974412,"index.wasm":39509339},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 	const GODOT_THREADS_ENABLED = false;
 	const engine = new Engine(GODOT_CONFIG);
 	const overlay = document.getElementById("intro-overlay");
@@ -274,6 +276,49 @@ body {
 	const loadingLabel = document.getElementById("loading-label");
 	const bootError = document.getElementById("boot-error");
 	const canvas = document.getElementById("canvas");
+
+	// --- Language ---------------------------------------------------------------
+	// The loading screen has to choose a language before Godot exists, so it reads
+	// the same namespaced localStorage key the game writes and falls back to the
+	// browser's own language. Strings come from locale/*.po via intro-i18n.js.
+	const STRINGS = window.QINGQUE_I18N || {};
+	const LOCALE_KEY = window.QINGQUE_LOCALE_KEY || "qingque.locale";
+
+	function pickLocale() {
+		let stored = null;
+		try {
+			stored = window.localStorage.getItem(LOCALE_KEY);
+		} catch (err) {}
+		if (stored && STRINGS[stored]) {
+			return stored;
+		}
+		const preferred = navigator.languages || [navigator.language || ""];
+		for (let i = 0; i < preferred.length; i++) {
+			if (String(preferred[i]).toLowerCase().indexOf("zh") === 0) {
+				return "zh_CN";
+			}
+		}
+		return STRINGS.en ? "en" : "zh_CN";
+	}
+
+	const locale = pickLocale();
+	const text = STRINGS[locale] || {};
+
+	function applyLocale() {
+		if (text.lang) {
+			document.documentElement.lang = text.lang;
+		}
+		loadingLabel.textContent = text.loading || "";
+		const subtitle = document.getElementById("subtitle");
+		if (subtitle && text.subtitle) {
+			subtitle.textContent = text.subtitle;
+		}
+		const heroTitle = document.getElementById("hero-title");
+		if (heroTitle && text.title_alt) {
+			heroTitle.alt = text.title_alt;
+		}
+	}
+	applyLocale();
 
 	let introDone = false;
 	let godotReady = false;
@@ -357,7 +402,7 @@ body {
 
 	function displayFailureNotice(err) {
 		console.error(err);
-		let message = "An unknown error occurred.";
+		let message = text["error.unknown"] || "An unknown error occurred.";
 		if (err instanceof Error) {
 			message = err.message;
 		} else if (typeof err === "string") {
@@ -368,7 +413,7 @@ body {
 		hideLoading();
 	}
 
-	// --- Intro timeline (same remap as HyperFrames source: 15s choreography → 5s) ---
+	// --- Intro timeline (same remap as HyperFrames source: choreography → 4s) ---
 	const mapT = function (t) {
 		return t <= 5 ? t / 2 : 2.5 + (t - 5) / 4;
 	};
@@ -409,7 +454,6 @@ body {
 			{ x: 0, y: 0, rotation: r, opacity: 1, duration: dur(start, 2.35), ease: "power3.out" },
 			at(start)
 		);
-		tl.to(selector, { x: x < 0 ? -25 : 25, y: -6, duration: dur(12.8, 1.6), ease: "sine.inOut" }, at(12.8));
 	});
 
 	tl.fromTo(
@@ -424,7 +468,7 @@ body {
 	tl.fromTo(".subtitle", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: dur(4.65, 1.15), ease: "power3.out" }, at(4.65));
 	tl.fromTo(".bottom-mark", { opacity: 0 }, { opacity: 0.6, duration: dur(4.7, 1.5), ease: "sine.out" }, at(4.7));
 	tl.fromTo(".shimmer", { backgroundPosition: "100% 50%" }, { backgroundPosition: "0% 50%", duration: dur(8, 1.4), ease: "sine.inOut" }, at(8));
-	tl.fromTo(".world", { scale: 1 }, { scale: 1.025, duration: dur(6, 6.8), ease: "sine.inOut" }, at(6));
+	tl.fromTo(".world", { scale: 1 }, { scale: 1.025, duration: dur(6, 5), ease: "sine.inOut" }, at(6));
 
 	const field = document.getElementById("particles");
 	for (let i = 0; i < 34; i++) {
@@ -444,10 +488,9 @@ body {
 		tl.fromTo(
 			dot,
 			{ y: 12, x: 0 },
-			{ y: -45 - (i % 4) * 18, x: (i % 2 ? 1 : -1) * (12 + (i % 6) * 3), duration: dur(0, 15), ease: "none" },
+			{ y: -45 - (i % 4) * 18, x: (i % 2 ? 1 : -1) * (12 + (i % 6) * 3), duration: dur(0, 11), ease: "none" },
 			at(0)
 		);
-		tl.to(dot, { opacity: 0.06, duration: dur(12.8, 2.2), ease: "sine.inOut" }, at(12.8));
 	}
 
 	tl.play(0);
@@ -456,6 +499,11 @@ body {
 	const missing = Engine.getMissingFeatures({
 		threads: GODOT_THREADS_ENABLED,
 	});
+
+	function missingFeaturesMessage() {
+		const heading = text["error.missing_features"] || "Missing browser features:";
+		return heading + "\n" + missing.join("\n");
+	}
 
 	if (missing.length !== 0) {
 		if (
@@ -489,16 +537,10 @@ body {
 				})
 				.catch(function (err) {
 					console.error("Error while registering service worker:", err);
-					displayFailureNotice(
-						"Error\nThe following features required to run Godot projects on the Web are missing:\n" +
-							missing.join("\n")
-					);
+					displayFailureNotice(missingFeaturesMessage());
 				});
 		} else {
-			displayFailureNotice(
-				"Error\nThe following features required to run Godot projects on the Web are missing:\n" +
-					missing.join("\n")
-			);
+			displayFailureNotice(missingFeaturesMessage());
 		}
 		return;
 	}
