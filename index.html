@@ -26,9 +26,10 @@ body {
 	overflow: hidden;
 	touch-action: none;
 }
-/* Logical stage: always landscape-sized. In portrait we CSS-rotate this root so
-   the game (and intro) stay 16:9 regardless of device orientation lock. */
-#orient-root {
+/* Fills the window in any orientation. It is never CSS-rotated: Godot maps taps
+   from getBoundingClientRect() and clientX/Y, which ignore transforms, so a rotated
+   canvas sends every tap to the wrong place. Landscape comes from the PWA. */
+#app-root {
 	position: fixed;
 	left: 0;
 	top: 0;
@@ -36,7 +37,6 @@ body {
 	height: 100%;
 	overflow: hidden;
 	background: #ede7d8;
-	transform-origin: center center;
 }
 #canvas {
 	display: block;
@@ -301,7 +301,7 @@ body {
 
 </head>
 <body>
-<div id="orient-root">
+<div id="app-root">
 <canvas id="canvas">Your browser does not support the canvas tag.</canvas>
 <noscript>Your browser does not support JavaScript.</noscript>
 
@@ -356,9 +356,8 @@ body {
 </div>
 </div>
 
-<!-- Outside #orient-root on purpose: that root is CSS-rotated in portrait, and the
-     dialog's share-sheet arrows must point at the real browser chrome. Manual mode:
-     it only opens from the Install button. -->
+<!-- Outside #app-root, so its dialog sits over the page rather than inside the
+     game's stacking context. Manual mode: it only opens from the Install button. -->
 <pwa-install
 	id="pwa-install"
 	manual-apple
@@ -373,10 +372,9 @@ body {
 <script src="index.js"></script>
 <script>
 (function () {
-	const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":8688824,"index.wasm":39509339},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
+	const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":8686952,"index.wasm":39509339},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
 	const GODOT_THREADS_ENABLED = false;
 	const engine = new Engine(GODOT_CONFIG);
-	const orientRoot = document.getElementById("orient-root");
 	const overlay = document.getElementById("intro-overlay");
 	const stageFrame = document.getElementById("stage-frame");
 	const loadingLabel = document.getElementById("loading-label");
@@ -430,100 +428,17 @@ body {
 		}
 	}
 
-	// --- Forced visual landscape -----------------------------------------------
-	// Mobile browsers will not lock orientation from a normal tab. When the
-	// physical window is portrait, we size #orient-root as landscape, CSS-rotate
-	// it 90°, and report swapped innerWidth/innerHeight so Godot's adaptive
-	// canvas still lays out 16:9.
-	const innerWidthDesc =
-		Object.getOwnPropertyDescriptor(window, "innerWidth") ||
-		Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), "innerWidth");
-	const innerHeightDesc =
-		Object.getOwnPropertyDescriptor(window, "innerHeight") ||
-		Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), "innerHeight");
-
-	function rawInnerSize() {
-		const vv = window.visualViewport;
-		if (vv && vv.width > 0 && vv.height > 0) {
-			return { w: Math.round(vv.width), h: Math.round(vv.height) };
-		}
-		return {
-			w: Math.round(innerWidthDesc.get.call(window)),
-			h: Math.round(innerHeightDesc.get.call(window)),
-		};
-	}
-
-	let logicalW = rawInnerSize().w;
-	let logicalH = rawInnerSize().h;
-	let applyingOrientation = false;
-
-	Object.defineProperty(window, "innerWidth", {
-		configurable: true,
-		enumerable: true,
-		get: function () {
-			return logicalW;
-		},
-	});
-	Object.defineProperty(window, "innerHeight", {
-		configurable: true,
-		enumerable: true,
-		get: function () {
-			return logicalH;
-		},
-	});
-
+	// --- Intro stage scaling ---------------------------------------------------
+	// The intro is authored at 1920×1080 and scaled to fit the window as it is,
+	// portrait included; Godot's canvas follows the window on its own. A player who
+	// wants landscape without browser chrome installs the PWA.
 	function fitStage() {
-		const scale = Math.min(logicalW / 1920, logicalH / 1080);
+		const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
 		stageFrame.style.transform = "scale(" + scale + ")";
 	}
 
-	function applyOrientation() {
-		if (applyingOrientation) {
-			return;
-		}
-		applyingOrientation = true;
-		const raw = rawInnerSize();
-		const portrait = raw.w < raw.h;
-		if (portrait) {
-			logicalW = raw.h;
-			logicalH = raw.w;
-			orientRoot.style.width = logicalW + "px";
-			orientRoot.style.height = logicalH + "px";
-			orientRoot.style.left = (raw.w - logicalW) / 2 + "px";
-			orientRoot.style.top = (raw.h - logicalH) / 2 + "px";
-			orientRoot.style.transform = "rotate(90deg)";
-			orientRoot.classList.add("is-portrait");
-		} else {
-			logicalW = raw.w;
-			logicalH = raw.h;
-			orientRoot.style.width = "100%";
-			orientRoot.style.height = "100%";
-			orientRoot.style.left = "0";
-			orientRoot.style.top = "0";
-			orientRoot.style.transform = "";
-			orientRoot.classList.remove("is-portrait");
-		}
-		fitStage();
-		// Notify Godot while the re-entrancy guard is still set so our own
-		// resize listener does not recurse; Godot still receives the event.
-		window.dispatchEvent(new Event("resize"));
-		applyingOrientation = false;
-	}
-
-	applyOrientation();
-	window.addEventListener("resize", applyOrientation);
-	window.addEventListener("orientationchange", function () {
-		window.setTimeout(applyOrientation, 50);
-		window.setTimeout(applyOrientation, 300);
-	});
-	if (window.visualViewport) {
-		window.visualViewport.addEventListener("resize", applyOrientation);
-		window.visualViewport.addEventListener("scroll", applyOrientation);
-	}
-
-	// Keep layout in sync if the browser enters/exits fullscreen via other chrome.
-	document.addEventListener("fullscreenchange", applyOrientation);
-	document.addEventListener("webkitfullscreenchange", applyOrientation);
+	fitStage();
+	window.addEventListener("resize", fitStage);
 
 	// --- Install offer ---------------------------------------------------------
 	// A phone browser's toolbars eat most of a landscape viewport, so a mobile
