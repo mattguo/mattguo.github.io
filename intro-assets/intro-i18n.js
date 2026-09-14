@@ -3,6 +3,9 @@ window.QINGQUE_I18N = {
   "en": {
     "error.missing_features": "This browser is missing features the game needs to run:",
     "error.unknown": "An unknown error occurred.",
+    "install.browser": "Play in Browser",
+    "install.button": "Install App",
+    "install.lead": "Install it for a full-screen table",
     "lang": "en",
     "loading": "Loading…",
     "subtitle": "MAHJONG",
@@ -11,6 +14,9 @@ window.QINGQUE_I18N = {
   "zh_CN": {
     "error.missing_features": "无法运行：当前浏览器缺少以下功能：",
     "error.unknown": "发生了未知错误。",
+    "install.browser": "在浏览器中游玩",
+    "install.button": "安装应用",
+    "install.lead": "安装到主屏幕，全屏展开牌桌",
     "lang": "zh-CN",
     "loading": "载入中…",
     "subtitle": "MAHJONG",

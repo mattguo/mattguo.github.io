@@ -5,11 +5,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 <title>Majhong2</title>
+<!-- Home-screen label and standalone launch for iOS; the manifest covers the rest. -->
+<meta name="apple-mobile-web-app-title" content="青雀">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
 html, body, #canvas {
 	margin: 0;
 	padding: 0;
 	border: 0;
+}
+html, body {
+	width: 100%;
+	height: 100%;
 }
 body {
 	color: #164d3e;
@@ -18,9 +26,21 @@ body {
 	overflow: hidden;
 	touch-action: none;
 }
+/* Logical stage: always landscape-sized. In portrait we CSS-rotate this root so
+   the game (and intro) stay 16:9 regardless of device orientation lock. */
+#orient-root {
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	background: #ede7d8;
+	transform-origin: center center;
+}
 #canvas {
 	display: block;
-	position: fixed;
+	position: absolute;
 	inset: 0;
 	width: 100%;
 	height: 100%;
@@ -30,7 +50,7 @@ body {
 }
 
 #intro-overlay {
-	position: fixed;
+	position: absolute;
 	inset: 0;
 	z-index: 20;
 	display: flex;
@@ -192,6 +212,69 @@ body {
 	background: linear-gradient(#ad935a, transparent); opacity: 0;
 }
 
+/* Install offer for mobile browsers. Lives outside the scaled 1920×1080 stage so
+   the buttons keep a real 44px touch height on a phone. */
+#install-gate {
+	position: absolute;
+	z-index: 25;
+	left: 0;
+	right: 0;
+	bottom: max(18px, env(safe-area-inset-bottom, 0px));
+	padding: 0 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	font-family: Garamond, "Palatino Linotype", Palatino, "Times New Roman", Times, serif;
+	color: #164d3e;
+}
+#install-gate[hidden] {
+	display: none !important;
+}
+.gate-lead {
+	margin: 0;
+	font-size: 15px;
+	letter-spacing: 2px;
+	color: #6c714f;
+	text-align: center;
+}
+.gate-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 12px;
+}
+.gate-btn {
+	min-width: 150px;
+	min-height: 44px;
+	padding: 0 22px;
+	border-radius: 8px;
+	font: inherit;
+	font-size: 17px;
+	letter-spacing: 2px;
+	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
+	touch-action: manipulation;
+}
+.gate-btn.primary {
+	background: #174f3e;
+	color: #fff7dc;
+	border: 1px solid #557962;
+	box-shadow: 0 3px 0 #0f3c2c, 0 8px 18px rgba(76, 69, 41, 0.18);
+}
+.gate-btn.primary:active {
+	transform: translateY(2px);
+	box-shadow: 0 1px 0 #0f3c2c, 0 4px 10px rgba(76, 69, 41, 0.18);
+}
+.gate-btn.secondary {
+	background: rgba(237, 231, 216, 0.94);
+	color: #164d3e;
+	border: 1px solid rgba(158, 132, 77, 0.45);
+}
+.gate-btn.secondary:active {
+	background: #e5dcc6;
+}
+
 #boot-error {
 	display: none;
 	position: absolute;
@@ -214,9 +297,11 @@ body {
 </style>
 <link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+<link rel="manifest" href="index.manifest.json">
 
 </head>
 <body>
+<div id="orient-root">
 <canvas id="canvas">Your browser does not support the canvas tag.</canvas>
 <noscript>Your browser does not support JavaScript.</noscript>
 
@@ -261,21 +346,44 @@ body {
 		</div>
 	</div>
 	<div id="boot-error" role="alert"></div>
+	<div id="install-gate" hidden>
+		<p class="gate-lead" id="install-lead"></p>
+		<div class="gate-actions">
+			<button type="button" class="gate-btn primary" id="install-btn"></button>
+			<button type="button" class="gate-btn secondary" id="browser-btn"></button>
+		</div>
+	</div>
 </div>
+</div>
+
+<!-- Outside #orient-root on purpose: that root is CSS-rotated in portrait, and the
+     dialog's share-sheet arrows must point at the real browser chrome. Manual mode:
+     it only opens from the Install button. -->
+<pwa-install
+	id="pwa-install"
+	manual-apple
+	manual-chrome
+	disable-screenshots
+	manifest-url="index.manifest.json">
+</pwa-install>
 
 <script src="intro-assets/intro-i18n.js"></script>
 <script src="intro-assets/gsap.min.js"></script>
+<script src="intro-assets/pwa-install.bundle.js"></script>
 <script src="index.js"></script>
 <script>
 (function () {
-	const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":7974412,"index.wasm":39509339},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+	const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":8688824,"index.wasm":39509339},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
 	const GODOT_THREADS_ENABLED = false;
 	const engine = new Engine(GODOT_CONFIG);
+	const orientRoot = document.getElementById("orient-root");
 	const overlay = document.getElementById("intro-overlay");
 	const stageFrame = document.getElementById("stage-frame");
 	const loadingLabel = document.getElementById("loading-label");
 	const bootError = document.getElementById("boot-error");
 	const canvas = document.getElementById("canvas");
+	const installGate = document.getElementById("install-gate");
+	const installer = document.getElementById("pwa-install");
 
 	// --- Language ---------------------------------------------------------------
 	// The loading screen has to choose a language before Godot exists, so it reads
@@ -309,6 +417,9 @@ body {
 			document.documentElement.lang = text.lang;
 		}
 		loadingLabel.textContent = text.loading || "";
+		document.getElementById("install-lead").textContent = text["install.lead"] || "";
+		document.getElementById("install-btn").textContent = text["install.button"] || "Install App";
+		document.getElementById("browser-btn").textContent = text["install.browser"] || "Play in Browser";
 		const subtitle = document.getElementById("subtitle");
 		if (subtitle && text.subtitle) {
 			subtitle.textContent = text.subtitle;
@@ -318,19 +429,160 @@ body {
 			heroTitle.alt = text.title_alt;
 		}
 	}
+
+	// --- Forced visual landscape -----------------------------------------------
+	// Mobile browsers will not lock orientation from a normal tab. When the
+	// physical window is portrait, we size #orient-root as landscape, CSS-rotate
+	// it 90°, and report swapped innerWidth/innerHeight so Godot's adaptive
+	// canvas still lays out 16:9.
+	const innerWidthDesc =
+		Object.getOwnPropertyDescriptor(window, "innerWidth") ||
+		Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), "innerWidth");
+	const innerHeightDesc =
+		Object.getOwnPropertyDescriptor(window, "innerHeight") ||
+		Object.getOwnPropertyDescriptor(Object.getPrototypeOf(window), "innerHeight");
+
+	function rawInnerSize() {
+		const vv = window.visualViewport;
+		if (vv && vv.width > 0 && vv.height > 0) {
+			return { w: Math.round(vv.width), h: Math.round(vv.height) };
+		}
+		return {
+			w: Math.round(innerWidthDesc.get.call(window)),
+			h: Math.round(innerHeightDesc.get.call(window)),
+		};
+	}
+
+	let logicalW = rawInnerSize().w;
+	let logicalH = rawInnerSize().h;
+	let applyingOrientation = false;
+
+	Object.defineProperty(window, "innerWidth", {
+		configurable: true,
+		enumerable: true,
+		get: function () {
+			return logicalW;
+		},
+	});
+	Object.defineProperty(window, "innerHeight", {
+		configurable: true,
+		enumerable: true,
+		get: function () {
+			return logicalH;
+		},
+	});
+
+	function fitStage() {
+		const scale = Math.min(logicalW / 1920, logicalH / 1080);
+		stageFrame.style.transform = "scale(" + scale + ")";
+	}
+
+	function applyOrientation() {
+		if (applyingOrientation) {
+			return;
+		}
+		applyingOrientation = true;
+		const raw = rawInnerSize();
+		const portrait = raw.w < raw.h;
+		if (portrait) {
+			logicalW = raw.h;
+			logicalH = raw.w;
+			orientRoot.style.width = logicalW + "px";
+			orientRoot.style.height = logicalH + "px";
+			orientRoot.style.left = (raw.w - logicalW) / 2 + "px";
+			orientRoot.style.top = (raw.h - logicalH) / 2 + "px";
+			orientRoot.style.transform = "rotate(90deg)";
+			orientRoot.classList.add("is-portrait");
+		} else {
+			logicalW = raw.w;
+			logicalH = raw.h;
+			orientRoot.style.width = "100%";
+			orientRoot.style.height = "100%";
+			orientRoot.style.left = "0";
+			orientRoot.style.top = "0";
+			orientRoot.style.transform = "";
+			orientRoot.classList.remove("is-portrait");
+		}
+		fitStage();
+		// Notify Godot while the re-entrancy guard is still set so our own
+		// resize listener does not recurse; Godot still receives the event.
+		window.dispatchEvent(new Event("resize"));
+		applyingOrientation = false;
+	}
+
+	applyOrientation();
+	window.addEventListener("resize", applyOrientation);
+	window.addEventListener("orientationchange", function () {
+		window.setTimeout(applyOrientation, 50);
+		window.setTimeout(applyOrientation, 300);
+	});
+	if (window.visualViewport) {
+		window.visualViewport.addEventListener("resize", applyOrientation);
+		window.visualViewport.addEventListener("scroll", applyOrientation);
+	}
+
+	// Keep layout in sync if the browser enters/exits fullscreen via other chrome.
+	document.addEventListener("fullscreenchange", applyOrientation);
+	document.addEventListener("webkitfullscreenchange", applyOrientation);
+
+	// --- Install offer ---------------------------------------------------------
+	// A phone browser's toolbars eat most of a landscape viewport, so a mobile
+	// visitor who is not already inside the installed app is offered an install at
+	// the end of the intro instead of being handed the game. The engine does not
+	// start downloading until they choose to play here: an iOS home-screen app keeps
+	// its own storage, so bytes fetched in Safari are wasted on anyone who installs.
+	// The per-browser install flow (prompt vs. Share-sheet steps) is <pwa-install>'s.
+	function isMobileDevice() {
+		if (navigator.userAgentData && navigator.userAgentData.mobile) {
+			return true;
+		}
+		const ua = navigator.userAgent || "";
+		if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) {
+			return true;
+		}
+		// iPadOS Safari reports a desktop Mac user agent.
+		return /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+	}
+
+	function isInstalledApp() {
+		const modes = ["fullscreen", "standalone", "minimal-ui"];
+		for (let i = 0; i < modes.length; i++) {
+			if (window.matchMedia("(display-mode: " + modes[i] + ")").matches) {
+				return true;
+			}
+		}
+		return navigator.standalone === true;
+	}
+
+	const offerInstall = isMobileDevice() && !isInstalledApp();
+
+	function showInstallGate() {
+		if (!installGate.hidden) {
+			return;
+		}
+		installGate.hidden = false;
+		gsap.fromTo(installGate, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" });
+	}
+
+	document.getElementById("install-btn").addEventListener("click", function (event) {
+		event.preventDefault();
+		if (installer && typeof installer.showDialog === "function") {
+			installer.showDialog(true);
+		}
+	});
+	document.getElementById("browser-btn").addEventListener("click", function (event) {
+		event.preventDefault();
+		installGate.hidden = true;
+		bootEngine();
+		tryHandoff();
+	});
+
 	applyLocale();
 
 	let introDone = false;
 	let godotReady = false;
 	let handedOff = false;
 	let loadingTween = null;
-
-	function fitStage() {
-		const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-		stageFrame.style.transform = "scale(" + scale + ")";
-	}
-	fitStage();
-	window.addEventListener("resize", fitStage);
 
 	function showLoading() {
 		if (loadingLabel.style.visibility === "visible") {
@@ -382,6 +634,10 @@ body {
 			return;
 		}
 		if (!introDone) {
+			return;
+		}
+		if (!engineStarted) {
+			showInstallGate();
 			return;
 		}
 		if (!godotReady) {
@@ -495,64 +751,77 @@ body {
 
 	tl.play(0);
 
-	// --- Godot boot (parallel with intro) ---
-	const missing = Engine.getMissingFeatures({
-		threads: GODOT_THREADS_ENABLED,
-	});
+	// --- Godot boot: in parallel with the intro, or on "Play in Browser" --------
+	let engineStarted = false;
 
-	function missingFeaturesMessage() {
-		const heading = text["error.missing_features"] || "Missing browser features:";
-		return heading + "\n" + missing.join("\n");
-	}
-
-	if (missing.length !== 0) {
-		if (
-			GODOT_CONFIG["serviceWorker"] &&
-			GODOT_CONFIG["ensureCrossOriginIsolationHeaders"] &&
-			"serviceWorker" in navigator
-		) {
-			let serviceWorkerRegistrationPromise;
-			try {
-				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
-			} catch (err) {
-				serviceWorkerRegistrationPromise = Promise.reject(new Error("Service worker registration failed."));
-			}
-			Promise.race([
-				serviceWorkerRegistrationPromise
-					.then(function (registration) {
-						if (registration != null) {
-							return Promise.reject(new Error("Service worker already exists."));
-						}
-						return registration;
-					})
-					.then(function () {
-						return engine.installServiceWorker();
-					}),
-				new Promise(function (resolve) {
-					setTimeout(resolve, 2000);
-				}),
-			])
-				.then(function () {
-					window.location.reload();
-				})
-				.catch(function (err) {
-					console.error("Error while registering service worker:", err);
-					displayFailureNotice(missingFeaturesMessage());
-				});
-		} else {
-			displayFailureNotice(missingFeaturesMessage());
+	function bootEngine() {
+		if (engineStarted) {
+			return;
 		}
-		return;
+		engineStarted = true;
+
+		const missing = Engine.getMissingFeatures({
+			threads: GODOT_THREADS_ENABLED,
+		});
+
+		function missingFeaturesMessage() {
+			const heading = text["error.missing_features"] || "Missing browser features:";
+			return heading + "\n" + missing.join("\n");
+		}
+
+		if (missing.length !== 0) {
+			if (
+				GODOT_CONFIG["serviceWorker"] &&
+				GODOT_CONFIG["ensureCrossOriginIsolationHeaders"] &&
+				"serviceWorker" in navigator
+			) {
+				let serviceWorkerRegistrationPromise;
+				try {
+					serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+				} catch (err) {
+					serviceWorkerRegistrationPromise = Promise.reject(new Error("Service worker registration failed."));
+				}
+				Promise.race([
+					serviceWorkerRegistrationPromise
+						.then(function (registration) {
+							if (registration != null) {
+								return Promise.reject(new Error("Service worker already exists."));
+							}
+							return registration;
+						})
+						.then(function () {
+							return engine.installServiceWorker();
+						}),
+					new Promise(function (resolve) {
+						setTimeout(resolve, 2000);
+					}),
+				])
+					.then(function () {
+						window.location.reload();
+					})
+					.catch(function (err) {
+						console.error("Error while registering service worker:", err);
+						displayFailureNotice(missingFeaturesMessage());
+					});
+			} else {
+				displayFailureNotice(missingFeaturesMessage());
+			}
+			return;
+		}
+
+		engine
+			.startGame({
+				canvas: canvas,
+				onProgress: function () {
+					/* progress is absorbed by the intro / Loading label */
+				},
+			})
+			.then(markGodotReady, displayFailureNotice);
 	}
 
-	engine
-		.startGame({
-			canvas: canvas,
-			onProgress: function () {
-				/* progress is absorbed by the intro / Loading label */
-			},
-		})
-		.then(markGodotReady, displayFailureNotice);
+	if (!offerInstall) {
+		bootEngine();
+	}
 })();
 </script>
 </body>
