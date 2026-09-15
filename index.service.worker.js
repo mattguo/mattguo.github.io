@@ -4,7 +4,7 @@
 // Incrementing CACHE_VERSION will kick off the install event and force
 // previously cached resources to be updated from the network.
 /** @type {string} */
-const CACHE_VERSION = '1789379472|29766396';
+const CACHE_VERSION = '1789503078|2053280';
 /** @type {string} */
 const CACHE_PREFIX = 'Majhong2-sw-cache-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;

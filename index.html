@@ -294,6 +294,33 @@ body {
 	z-index: 30;
 }
 #boot-error.is-visible { display: block; }
+
+/* Debug readout for touch mapping; toggled with a three-finger tap. */
+#touch-hud {
+	position: fixed;
+	left: 0;
+	top: 0;
+	z-index: 40;
+	max-width: 100vw;
+	padding: 6px 8px;
+	background: rgba(0, 0, 0, 0.72);
+	color: #fff;
+	font: 11px/1.35 Menlo, monospace;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	box-sizing: border-box;
+	pointer-events: none;
+}
+#touch-dot {
+	position: fixed;
+	z-index: 41;
+	width: 14px;
+	height: 14px;
+	margin: -9px 0 0 -9px;
+	border: 2px solid #ff3cff;
+	border-radius: 50%;
+	pointer-events: none;
+}
 </style>
 <link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
@@ -355,6 +382,8 @@ body {
 	</div>
 </div>
 </div>
+<div id="touch-hud" hidden></div>
+<div id="touch-dot" hidden></div>
 
 <!-- Outside #app-root, so its dialog sits over the page rather than inside the
      game's stacking context. Manual mode: it only opens from the Install button. -->
@@ -372,7 +401,7 @@ body {
 <script src="index.js"></script>
 <script>
 (function () {
-	const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":8686952,"index.wasm":39509339},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
+	const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":8687608,"index.wasm":39509339},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"serviceWorker":"index.service.worker.js"};
 	const GODOT_THREADS_ENABLED = false;
 	const engine = new Engine(GODOT_CONFIG);
 	const overlay = document.getElementById("intro-overlay");
@@ -736,6 +765,87 @@ body {
 
 	if (!offerInstall) {
 		bootEngine();
+	}
+
+	// --- Touch-mapping readout (debug) -----------------------------------------
+	// Three-finger tap toggles it; ?hud forces it on. It listens in the capture
+	// phase without preventDefault, so Godot still receives every touch. The
+	// "godot" line is written by app.gd through JavaScriptBridge.
+	const hud = document.getElementById("touch-hud");
+	const dot = document.getElementById("touch-dot");
+	const HUD_KEY = "qingque.touchHud";
+	const sizeLog = [];
+	let lastTouch = "none";
+
+	function round(v) {
+		return Math.round(v * 10) / 10;
+	}
+
+	function renderHud() {
+		if (hud.hidden) {
+			return;
+		}
+		const r = canvas.getBoundingClientRect();
+		const vv = window.visualViewport;
+		const orient = (screen.orientation && screen.orientation.type) || String(window.orientation);
+		hud.textContent = [
+			"orient " + orient + "  screen " + screen.width + "x" + screen.height + "  dpr " + window.devicePixelRatio,
+			"inner " + window.innerWidth + "x" + window.innerHeight +
+				"  docEl " + document.documentElement.clientWidth + "x" + document.documentElement.clientHeight,
+			vv ? "vv " + round(vv.width) + "x" + round(vv.height) + " off " + round(vv.offsetLeft) + "," + round(vv.offsetTop) +
+				" scale " + round(vv.scale) : "vv none",
+			"scroll " + window.scrollX + "," + window.scrollY,
+			"canvas px " + canvas.width + "x" + canvas.height + "  css " + canvas.style.width + "x" + canvas.style.height,
+			"rect " + round(r.x) + "," + round(r.y) + " " + round(r.width) + "x" + round(r.height),
+			"touch " + lastTouch,
+			"godot " + (window.__qingqueGodot || "-"),
+			"events " + sizeLog.join(" | "),
+		].join("\n");
+	}
+
+	function setHud(on) {
+		hud.hidden = !on;
+		dot.hidden = !on;
+		try {
+			window.localStorage.setItem(HUD_KEY, on ? "1" : "0");
+		} catch (err) {}
+		renderHud();
+	}
+
+	window.addEventListener("touchstart", function (evt) {
+		if (evt.touches.length === 3) {
+			setHud(hud.hidden);
+			return;
+		}
+		const t = evt.changedTouches[0];
+		const r = canvas.getBoundingClientRect();
+		const el = document.elementFromPoint(t.clientX, t.clientY);
+		const px = (t.clientX - r.x) * canvas.width / r.width;
+		const py = (t.clientY - r.y) * canvas.height / r.height;
+		lastTouch = "client " + round(t.clientX) + "," + round(t.clientY) +
+			" page " + round(t.pageX) + "," + round(t.pageY) +
+			" -> px " + round(px) + "," + round(py) +
+			" hit " + (el ? el.id || el.tagName : "null");
+		dot.style.left = t.clientX + "px";
+		dot.style.top = t.clientY + "px";
+		renderHud();
+	}, { capture: true, passive: true });
+
+	function logSize(evt) {
+		sizeLog.unshift(evt.type.slice(0, 6) + " " + window.innerWidth + "x" + window.innerHeight);
+		sizeLog.length = Math.min(sizeLog.length, 4);
+		renderHud();
+	}
+	window.addEventListener("resize", logSize);
+	window.addEventListener("orientationchange", logSize);
+	setInterval(renderHud, 500);
+
+	let hudOn = /[?&]hud\b/.test(window.location.search);
+	try {
+		hudOn = hudOn || window.localStorage.getItem(HUD_KEY) === "1";
+	} catch (err) {}
+	if (hudOn) {
+		setHud(true);
 	}
 })();
 </script>
